@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '11-2023'
+
+Parameters:
+  KeyName:
+    Type: String
+    Description: The EC2 Key Pair to allow SSH access to the instances
+
+Resources:
+  #VPC
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: MyVPC
+
+  # Subnet
+  MySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: '10.0.0.0/24'
+      AvailabilityZone: 'us-east-1a'
+      Tags:
+        - Key: Name
+          Value: MySubnet
