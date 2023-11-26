@@ -93,5 +93,5 @@ app.delete('/users/:id', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}, ${process.env.DB_HOST, process.env.DB_USER}`);
+  console.log(`Server is running on port ${port}`);
 });
