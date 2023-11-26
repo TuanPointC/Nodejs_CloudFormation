@@ -1,29 +1,374 @@
-AWSTemplateFormatVersion: '11-2023'
-
 Parameters:
-  KeyName:
+  SecurityGroupDescription:
+    Description: Security Group Description
     Type: String
-    Description: The EC2 Key Pair to allow SSH access to the instances
+  KeyName:
+    Description: Key Pair for EC2
+    Type: 'AWS::EC2::KeyPair::KeyName'
 
 Resources:
-  #VPC
-  MyVPC:
+  VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: '10.0.0.0/16'
+      CidrBlock: 10.0.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: MyVPC
+          Value: VPC1
 
-  # Subnet
-  MySubnet:
-    Type: AWS::EC2::Subnet
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
     Properties:
-      VpcId: !Ref MyVPC
-      CidrBlock: '10.0.0.0/24'
-      AvailabilityZone: 'us-east-1a'
       Tags:
         - Key: Name
-          Value: MySubnet
+          Value: VPC Internet Gateway
+    DependsOn: VPC
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+    DependsOn: 
+      - VPC
+      - InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet 1
+    DependsOn: VPC
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [ 0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: Private Subnet 1
+    DependsOn: VPC
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet 2
+    DependsOn: VPC
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [ 1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: Private Subnet 2
+    DependsOn: VPC
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Public Route Table
+    DependsOn: 
+      - VPC
+      - InternetGateway
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+    DependsOn: 
+      - VPC
+      - InternetGateway
+
+  PublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+    DependsOn: 
+      - PublicSubnet1
+      - PublicSubnet2
+
+  PublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+    DependsOn: 
+      - PublicSubnet2
+      - PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Private Route Table
+    DependsOn: VPC
+
+  PrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+    DependsOn: 
+      - PublicSubnet1
+      - PrivateRouteTable
+
+  PrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+    DependsOn: 
+      - PrivateSubnet2
+      - PrivateRouteTable
+
+  # EC2 Instances
+  EC2Instance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-078c1149d8ad719a7 
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      SubnetId: !Ref PublicSubnet1
+      KeyName: !Ref KeyName
+      UserData: 
+        Fn::Base64:
+          |
+          #!/bin/bash 
+          set -e
+          curl -sL https://deb.nodesource.com/setup_16.x | bash -
+          sudo apt install nodejs
+          node -v
+          npm -v
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          sudo apt update && sudo apt install yarn
+          yarn --version
+          sudo -i -u ubuntu bash << EOF
+          set -e
+          cd /home/ubuntu
+          sudo npm install -g pm2
+          git clone https://github.com/TuanPointC/nodejs_cloudformation.git
+          cd crud-app-backend
+          npm install 
+          DB_HOST=users.caj5b63ailt3.ap-southeast-1.rds.amazonaws.com DB_USER=admin DB_PASSWORD=adminpassword DB_PORT=3306 pm2 start server.js
+          cd ..
+          cd crud-app-frontend/
+          npm install
+          npm start
+          EOF
+    DependsOn: 
+      - VPC
+      - EC2SecurityGroup
+      - PublicSubnet1
+
+
+  EC2Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-078c1149d8ad719a7
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      SubnetId: !Ref PublicSubnet2
+      KeyName: !Ref KeyName
+      UserData:
+        Fn::Base64:
+          |
+          #!/bin/bash 
+          set -e
+          curl -sL https://deb.nodesource.com/setup_16.x | bash -
+          sudo apt install nodejs
+          node -v
+          npm -v
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          sudo apt update && sudo apt install yarn
+          yarn --version
+          sudo -i -u ubuntu bash << EOF
+          set -e
+          cd /home/ubuntu
+          sudo npm install -g pm2
+          git clone https://github.com/TuanPointC/nodejs_cloudformation.git
+          cd crud-app-backend
+          yarn install 
+          DB_HOST=users.caj5b63ailt3.ap-southeast-1.rds.amazonaws.com DB_USER=admin DB_PASSWORD=adminpassword DB_PORT=3306 pm2 start server.js
+          cd ..
+          cd crud-app-frontend/
+          npm install
+          npm start
+          EOF
+    DependsOn: 
+      - VPC
+      - EC2SecurityGroup
+      - PublicSubnet2
+
+  # EC2 and ALB Security Groups
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ELB Security Group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+    DependsOn: 
+    - VPC 
+    - InternetGateway
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'ec2 sg'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId:
+            Fn::GetAtt:
+              - ELBSecurityGroup
+              - GroupId
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '3000'
+          ToPort: '3000'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '3001'
+          ToPort: '3001'
+          CidrIp: 0.0.0.0/0
+    DependsOn: 
+    - VPC 
+
+  # Target Group, Listener and Application Load Balancer
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200'
+      Name: EC2TargetGroup
+      Port: 3000
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      Targets:
+        - Id: !Ref EC2Instance1
+          Port: 3000
+        - Id: !Ref EC2Instance2
+          Port: 3000
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+    DependsOn: 
+    - VPC 
+    - EC2Instance1
+    - EC2Instance2
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 3000
+      Protocol: HTTP
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !GetAtt ELBSecurityGroup.GroupId
+    DependsOn: 
+      - PublicSubnet1
+      - PublicSubnet2
+  MyDBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: 5
+      DBInstanceIdentifier: users
+      Engine: mysql
+      MasterUsername: admin
+      MasterUserPassword: adminpassword
+      DBInstanceClass: db.t3.micro
+      EngineVersion: '8.0.33'
+      PubliclyAccessible: true
+      VPCSecurityGroups:
+        - !GetAtt MyDBSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
+    DependsOn: 
+      - VPC
+      - MyDBSubnetGroup
+      - InternetGateway
+  MyDBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Security group for RDS'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+    DependsOn: 
+      - VPC
+  MyDBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupName: MyDBSubnetGroup
+      DBSubnetGroupDescription: 'Subnet group for RDS'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+    DependsOn: 
+      - PublicSubnet1
+      - PublicSubnet2
+
+
+
+export DB_HOST='users.caj5b63ailt3.ap-southeast-1.rds.amazonaws.com'
+export DB_USER='admin'
+export DB_PASSWORD='adminpassword'
+export DB_NAME='users'
