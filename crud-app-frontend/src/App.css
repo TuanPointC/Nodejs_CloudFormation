@@ -120,3 +120,15 @@ body {
 }
 
 /* ... (đoạn mã trước đó) */
+.list-group{
+  display: flex;
+  flex-direction: column;
+}
+
+.list-group-item{
+  margin: 10px 0;
+}
+
+.btn-danger{
+  background-color: red;
+}

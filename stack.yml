@@ -152,7 +152,7 @@ Resources:
   EC2Instance1:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-078c1149d8ad719a7 
+      ImageId: ami-09a81b370b76de6a2
       InstanceType: t2.micro
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
@@ -193,7 +193,7 @@ Resources:
   EC2Instance2:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-078c1149d8ad719a7
+      ImageId: ami-09a81b370b76de6a2
       InstanceType: t2.micro
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
@@ -368,7 +368,7 @@ Resources:
 
 
 
-export DB_HOST='users.caj5b63ailt3.ap-southeast-1.rds.amazonaws.com'
+export DB_HOST='users.cxud9zixyfop.ap-northeast-1.rds.amazonaws.com'
 export DB_USER='admin'
 export DB_PASSWORD='adminpassword'
 export DB_NAME='users'

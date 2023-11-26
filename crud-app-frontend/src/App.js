@@ -54,7 +54,7 @@ function App() {
   return (
     <div className="body">
       <div className="container">
-        <h1 className="text-center mb-4">CRUD App</h1>
+        <h1 className="text-center mb-4">User Management</h1>
         <Form className="form-container" onSubmit={handleSubmit}>
           <Form.Group>
             <Form.Label>Username:</Form.Label>
@@ -83,6 +83,7 @@ function App() {
               {user.username} - {user.email}
               <Button
                 variant="danger"
+                type='danger'
                 size="sm"
                 className="float-right"
                 onClick={() => handleDelete(user.id)}
